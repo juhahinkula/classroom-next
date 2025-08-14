@@ -5,12 +5,12 @@ import { getReposDir, stopAllPreviews } from '@/lib/utils';
 
 export async function DELETE() {
   try {
-  // Ensure preview processes are stopped so Windows can delete folders
-  await stopAllPreviews();
-  const reposDir = getReposDir();
-    
+    // Ensure preview processes are stopped so Windows can delete folders
+    await stopAllPreviews();
+
+    const reposDir = getReposDir();
+
     if (fs.existsSync(reposDir)) {
-      // Remove the entire repos directory
       fs.rmSync(reposDir, { recursive: true, force: true });
       console.log('Repos folder deleted successfully');
     }
@@ -22,10 +22,10 @@ export async function DELETE() {
       console.log('Legacy repos folder deleted successfully');
     }
 
-    const message = (fs.existsSync(reposDir) || fs.existsSync(legacyReposDir))
-      ? 'Some repos folders could not be deleted (possibly in use).'
-      : 'Repos folder(s) deleted successfully';
-    return NextResponse.json({ message });
+    const message = (!fs.existsSync(reposDir) && !fs.existsSync(legacyReposDir))
+      ? 'Repos folder(s) deleted successfully'
+      : 'Some repos folders could not be deleted (possibly in use).';
+    return NextResponse.json({ message, paths: { reposDir, legacyReposDir } });
   } catch (error) {
     console.error('Error deleting repos folder:', error);
     return NextResponse.json({ error: 'Failed to delete repos folder' }, { status: 500 });

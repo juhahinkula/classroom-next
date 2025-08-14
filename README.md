@@ -27,11 +27,17 @@ npm install axios ag-grid-react ag-grid-community
 2. Set up environment variables by updating `.env.local`:
 ```env
 GITHUB_TOKEN=your_github_personal_access_token
-GITHUB_CLASSROOM_TOKEN=your_github_classroom_token
-GITHUB_ORG_NAME=your_github_organization_name
 PORT=3000
 STARTING_PORT=5173
+REPOS_BASE_DIR=C:\classroom-repos
 ```
+
+where
+- `GITHUB_TOKEN`: GitHub Personal Access Token used for GitHub Classroom and repository access. scopes: repo and read:org.
+- `PORT`: Port for the Next.js dev server (default 3000).
+- `STARTING_PORT`: Base port for student preview servers (each repo uses STARTING_PORT + index).
+- `REPOS_BASE_DIR`: Absolute path where student repositories are cloned (for example C:\classroom-repos). If not set, the system temp directory is used.
+
 
 ## Usage
 

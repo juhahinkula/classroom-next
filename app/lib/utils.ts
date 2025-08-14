@@ -1,21 +1,24 @@
 import axios from 'axios';
-import { exec } from 'child_process';
+import { exec, ChildProcess } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+// Track background preview processes so we can stop them later (Windows deletion requires no locks)
+const PREVIEW_PROCS = new Set<ChildProcess>();
+
 export async function fetchStudentRepos(assignmentId: string) {
-  const githubClassroomToken = process.env.GITHUB_CLASSROOM_TOKEN;
-  
-  if (!githubClassroomToken) {
-    throw new Error('GitHub Classroom token not configured');
+  const token = process.env.GITHUB_TOKEN || process.env.GITHUB_CLASSROOM_TOKEN;
+  if (!token) {
+    throw new Error('GitHub token not configured');
   }
 
   const url = `https://api.github.com/assignments/${assignmentId}/grades`;
   const headers = {
-    Authorization: `Bearer ${githubClassroomToken}`,
+    Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
   };
 
@@ -32,7 +35,7 @@ export async function fetchStudentRepos(assignmentId: string) {
 }
 
 export async function cloneAndStart(repo: any, index: number) {
-  const reposDir = path.join(process.cwd(), 'repos');
+  const reposDir = getReposDir();
   const folder = path.join(reposDir, repo.name);
   
   // Create repos directory if it doesn't exist
@@ -61,8 +64,38 @@ export async function cloneAndStart(repo: any, index: number) {
     
     console.log(`Starting preview for ${repo.name}...`);
     // Start preview server in background
-    exec(`pnpm preview --port ${5173 + index}`, { cwd: folder });
+  const startingPort = parseInt(process.env.STARTING_PORT || '5173');
+  const child = exec(`pnpm preview --port ${startingPort + index}`, { cwd: folder });
+  PREVIEW_PROCS.add(child);
+  child.on('exit', () => PREVIEW_PROCS.delete(child));
   } catch (err) {
     console.error(`Error in ${repo.name}:`, err);
   }
+}
+
+export function getReposDir() {
+  const base = process.env.REPOS_BASE_DIR || path.join(os.tmpdir(), 'classroom-repos');
+  if (!fs.existsSync(base)) {
+    fs.mkdirSync(base, { recursive: true });
+  }
+  return base;
+}
+
+export async function stopAllPreviews() {
+  const kills: Promise<void>[] = [];
+  for (const child of PREVIEW_PROCS) {
+    kills.push(new Promise<void>((resolve) => {
+      if (process.platform === 'win32') {
+        // Force kill the whole tree on Windows
+        exec(`taskkill /PID ${child.pid} /T /F`, (/*err*/)=> resolve());
+      } else {
+        try {
+          child.kill('SIGTERM');
+        } catch {}
+        resolve();
+      }
+    }));
+  }
+  await Promise.allSettled(kills);
+  PREVIEW_PROCS.clear();
 }

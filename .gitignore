@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# local clones of student repos (should be outside project, but ignore if present)
+/repos/
+
 # production
 /build
 
