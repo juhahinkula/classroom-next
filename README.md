@@ -20,7 +20,7 @@ GitHub Classroom manager built with Next.js, TypeScript, and ag-Grid for managin
 
 1. Install dependencies:
 ```bash
-npm install axios ag-grid-react ag-grid-community
+npm install axios ag-grid-react
 ```
 
 2. Set up environment variables by updating `.env.local`:
