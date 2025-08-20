@@ -1,14 +1,13 @@
 # Classroom Manager - Next.js
 
-A modern GitHub Classroom manager built with Next.js, TypeScript, and ag-Grid for managing student repositories and projects.
+GitHub Classroom manager built with Next.js, TypeScript, and ag-Grid for managing student repositories and projects. This is done for React Vite student projects but can be extended to handle other technologies.
 
 ## Features
 
-- **GitHub Classroom Integration**: Fetch classrooms and assignments directly from GitHub Classroom API
-- **Interactive Data Grid**: View student repositories with ag-Grid featuring sorting, filtering, and resizing
-- **Repository Management**: Clone, build, and preview student repositories automatically
-- **Live Preview Links**: Direct links to running student project previews
-- **Modern UI**: Built with Tailwind CSS and TypeScript for a great developer experience
+- Fetch classrooms and assignments directly from GitHub Classroom API
+- View student repositories with sorting and filtering.
+- Clone, build, and preview student repositories automatically
+- Direct links to running student project previews
 
 ## Prerequisites
 
