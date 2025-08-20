@@ -101,6 +101,8 @@ export default function Home() {
         const data = await response.json();
         console.log(data.message);
         alert('Repos folder deleted successfully!');
+        // Clear the grid data since repositories have been deleted
+        setRepoData([]);
       } catch (error) {
         console.error('Error deleting repos folder:', error);
         alert('Failed to delete repos folder');
