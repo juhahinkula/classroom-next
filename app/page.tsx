@@ -61,8 +61,20 @@ export default function Home() {
     setLoading(true);
     try {
       const response = await fetch(`/api/fetch?assignmentId=${assignmentId}`);
-      const data = await response.json();
-      setRepoData(data);
+      const repoList = await response.json();
+      const results: RepoData[] = [];
+   
+      for (let i = 0; i < repoList.length; i++) {
+        const repo = repoList[i];
+        const res = await fetch('/api/fetch-one', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repo, index: i })
+        });
+        const row = await res.json();
+        results.push(row);
+        setRepoData([...results]); // update grid after each repo
+      }
     } catch (error) {
       console.error('Error fetching repositories:', error);
     } finally {
