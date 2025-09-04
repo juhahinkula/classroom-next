@@ -14,6 +14,12 @@ interface Assignment {
   slug?: string;
 }
 
+interface Student {
+  roster_identifier: string;
+  github_username: string;
+  name: string;
+}
+
 interface RepoData {
   preview: {
     name: string;
@@ -28,8 +34,10 @@ interface RepoData {
 export default function Home() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [selectedClassroom, setSelectedClassroom] = useState<string>('');
   const [selectedAssignment, setSelectedAssignment] = useState<string>('');
+  const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [loading, setLoading] = useState(false);
   const [repoData, setRepoData] = useState<RepoData[]>([]);
   const [deleting, setDeleting] = useState(false);
@@ -66,10 +74,21 @@ export default function Home() {
     }
   };
 
-  const fetchRepositories = async (assignmentId: string) => {
+  const fetchStudents = async (assignmentId: string) => {
+    try {
+      const response = await fetch(`/api/students?assignmentId=${assignmentId}`);
+      const data = await response.json();
+      setStudents(data);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    }
+  };
+
+  const fetchRepositories = async (assignmentId: string, studentUsername?: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/fetch?assignmentId=${assignmentId}`);
+      const studentParam = studentUsername && studentUsername !== 'all' ? `&studentUsername=${studentUsername}` : '';
+      const response = await fetch(`/api/fetch?assignmentId=${assignmentId}${studentParam}`);
       const repoList = await response.json();
       const results: RepoData[] = [];
    
@@ -95,7 +114,9 @@ export default function Home() {
     const classroomId = e.target.value;
     setSelectedClassroom(classroomId);
     setSelectedAssignment('');
+    setSelectedStudent('all');
     setAssignments([]);
+    setStudents([]);
     setRepoData([]);
     
     if (classroomId) {
@@ -104,14 +125,26 @@ export default function Home() {
   };
 
   const handleAssignmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedAssignment(e.target.value);
+    const assignmentId = e.target.value;
+    setSelectedAssignment(assignmentId);
+    setSelectedStudent('all');
+    setStudents([]);
+    setRepoData([]);
+    
+    if (assignmentId) {
+      fetchStudents(assignmentId);
+    }
+  };
+
+  const handleStudentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedStudent(e.target.value);
     setRepoData([]);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedAssignment) {
-      fetchRepositories(selectedAssignment);
+      fetchRepositories(selectedAssignment, selectedStudent);
     }
   };
 
@@ -176,13 +209,31 @@ export default function Home() {
           </label>
         </div>
         
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            Student:
+            <select
+              value={selectedStudent}
+              onChange={handleStudentChange}
+              disabled={!selectedAssignment}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+            >
+              {students.map((s) => (
+                <option key={s.github_username} value={s.github_username}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        
         <div className="flex gap-4">
           <button
             type="submit"
             disabled={!selectedAssignment || loading}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
           >
-            {loading ? 'Fetching...' : 'Fetch'}
+            {loading ? 'Fetching...' : `Fetch ${selectedStudent === 'all' ? 'All' : 'Student'} Repositories`}
           </button>
           
           <button

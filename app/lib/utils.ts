@@ -10,7 +10,22 @@ const execAsync = promisify(exec);
 // Track background preview processes so we can stop them later (Windows deletion requires no locks)
 const PREVIEW_PROCS = new Set<ChildProcess>();
 
-export async function fetchStudentRepos(assignmentId: string) {
+interface StudentGrade {
+  student_repository_url: string;
+  roster_identifier: string;
+  github_username: string;
+  points_awarded: number;
+}
+
+export interface StudentRepo {
+  name: string;
+  clone_url: string;
+  roster_identifier: string;
+  github_username: string;
+  points_awarded: number;
+}
+
+export async function fetchStudentRepos(assignmentId: string): Promise<StudentRepo[]> {
   const token = process.env.GITHUB_TOKEN || process.env.GITHUB_CLASSROOM_TOKEN;
   if (!token) {
     throw new Error('GitHub token not configured');
@@ -22,10 +37,10 @@ export async function fetchStudentRepos(assignmentId: string) {
     Accept: 'application/vnd.github+json',
   };
 
-  const response = await axios.get(url, { headers });
+  const response = await axios.get<StudentGrade[]>(url, { headers });
   
   // Each item: { student_repository_url, roster_identifier, github_username, points_awarded }
-  return response.data.map((item: any) => ({
+  return response.data.map((item) => ({
     name: item.github_username,
     clone_url: item.student_repository_url,
     roster_identifier: item.roster_identifier,
@@ -34,7 +49,7 @@ export async function fetchStudentRepos(assignmentId: string) {
   }));
 }
 
-export async function cloneAndStart(repo: any, index: number) {
+export async function cloneAndStart(repo: StudentRepo, index: number) {
   const reposDir = getReposDir();
   const folder = path.join(reposDir, repo.name);
   
