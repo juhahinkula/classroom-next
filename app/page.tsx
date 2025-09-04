@@ -32,6 +32,15 @@ export default function Home() {
   const [selectedAssignment, setSelectedAssignment] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [repoData, setRepoData] = useState<RepoData[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [nameFilter, setNameFilter] = useState('');
+
+  // Filter repositories based on name filter
+  const filteredRepoData = repoData.filter(repo =>
+    repo.preview.name.toLowerCase().includes(nameFilter.toLowerCase()) ||
+    repo.githubUsername.toLowerCase().includes(nameFilter.toLowerCase()) ||
+    repo.rosterIdentifier.toLowerCase().includes(nameFilter.toLowerCase())
+  );
 
   useEffect(() => {
     fetchClassrooms();
@@ -108,6 +117,7 @@ export default function Home() {
 
   const deleteReposFolder = async () => {
     if (confirm('Are you sure you want to delete all cloned repositories? This action cannot be undone.')) {
+      setDeleting(true);
       try {
         const response = await fetch('/api/delete-repos', { method: 'DELETE' });
         const data = await response.json();
@@ -118,6 +128,8 @@ export default function Home() {
       } catch (error) {
         console.error('Error deleting repos folder:', error);
         alert('Failed to delete repos folder');
+      } finally {
+        setDeleting(false);
       }
     }
   };
@@ -176,9 +188,10 @@ export default function Home() {
           <button
             type="button"
             onClick={deleteReposFolder}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            disabled={deleting}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400"
           >
-            Delete Repos Folder
+            {deleting ? 'Deleting...' : 'Delete Repos Folder'}
           </button>
         </div>
       </form>
@@ -189,9 +202,30 @@ export default function Home() {
         </div>
       )}
       
+      {deleting && (
+        <div className="text-center py-4">
+          <p>Deleting repositories, please wait...</p>
+        </div>
+      )}
+      
       {repoData.length > 0 && (
         <div className="mt-6">
           <h2 className="text-xl font-semibold mb-4">Student Repositories</h2>
+          
+          {/* Name Filter Input */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-2">
+              Filter by Name, Username, or Real Name:
+              <input
+                type="text"
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+                placeholder="Type to filter repositories..."
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </label>
+          </div>
+          
           <div className="overflow-x-auto">
             <table className="min-w-full bg-white border border-gray-200">
               <thead className="bg-gray-50">
@@ -214,39 +248,47 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {repoData.map((repo, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                      <a 
-                        href={repo.preview.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                      >
-                        {repo.preview.name}
-                      </a>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {repo.rosterIdentifier}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {repo.githubUsername}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {repo.pointsAwarded}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                      <a 
-                        href={repo.repositoryUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                      >
-                        {repo.repositoryUrl.replace('https://github.com/', '').replace('.git', '')}
-                      </a>
+                {filteredRepoData.length > 0 ? (
+                  filteredRepoData.map((repo, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                        <a 
+                          href={repo.preview.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                        >
+                          {repo.preview.name}
+                        </a>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {repo.rosterIdentifier}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {repo.githubUsername}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {repo.pointsAwarded}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                        <a 
+                          href={repo.repositoryUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                        >
+                          {repo.repositoryUrl.replace('https://github.com/', '').replace('.git', '')}
+                        </a>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                      No repositories match the filter &quot;{nameFilter}&quot;
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
