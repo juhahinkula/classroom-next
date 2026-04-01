@@ -56,15 +56,15 @@ export async function cloneAndStart(repo: any, index: number) {
 
   try {
     console.log(`Installing dependencies for ${repo.name}...`);
-    await execAsync('pnpm install', { cwd: folder });
+    await execAsync('npm install', { cwd: folder });
     
     console.log(`Building ${repo.name}...`);
-    await execAsync('pnpm run build', { cwd: folder });
+    await execAsync('npm run build', { cwd: folder });
     
     console.log(`Starting preview for ${repo.name}...`);
     // Start preview server in background
   const startingPort = parseInt(process.env.STARTING_PORT || '5173');
-  const child = exec(`pnpm preview --port ${startingPort + index}`, { cwd: folder });
+  const child = exec(`npm preview --port ${startingPort + index}`, { cwd: folder });
   PREVIEW_PROCS.add(child);
   child.on('exit', () => PREVIEW_PROCS.delete(child));
   } catch (err) {
