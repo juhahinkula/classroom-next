@@ -1,10 +1,10 @@
-# Classroom Manager
+# Classroom Manager for teachers
 
-GitHub Classroom manager built with Next.js, TypeScript, and ag-Grid for managing student repositories and projects. This is done for React Vite student projects but can be extended to handle other technologies.
+Classroom50 manager built with Next.js, TypeScript, and ag-Grid for managing student repositories and projects. This is done for React Vite student projects but can be extended to handle other technologies.
 
 ## Features
 
-- Fetch classrooms and assignments directly from GitHub Classroom API
+- Fetch classrooms and assignments directly from Classroom50
 - View student repositories with sorting and filtering.
 - Clone, build, and preview student repositories automatically
 - Direct links to running student project previews
