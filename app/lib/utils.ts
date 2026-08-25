@@ -10,43 +10,77 @@ const execAsync = promisify(exec);
 // Track background preview processes so we can stop them later (Windows deletion requires no locks)
 const PREVIEW_PROCS = new Set<ChildProcess>();
 
-interface StudentGrade {
-  student_repository_url: string;
-  roster_identifier: string;
-  github_username: string;
-  points_awarded: number;
-}
-
 export interface StudentRepo {
   name: string;
   clone_url: string;
   roster_identifier: string;
   github_username: string;
-  points_awarded: number;
+  points_awarded: number | string;
 }
 
-export async function fetchStudentRepos(assignmentId: string): Promise<StudentRepo[]> {
+// ponytail: classroom50 has no grades API. Student repos follow the naming convention
+// <classroom>-<assignment>-<username>. Scores come from <org>/classroom50/<classroom>/scores.json;
+// roster from <org>/classroom50/<classroom>/roster.csv.
+export async function fetchStudentRepos(
+  org: string,
+  classroomSlug: string,
+  assignmentSlug: string
+): Promise<StudentRepo[]> {
   const token = process.env.GITHUB_TOKEN || process.env.GITHUB_CLASSROOM_TOKEN;
   if (!token) {
     throw new Error('GitHub token not configured');
   }
 
-  const url = `https://api.github.com/assignments/${assignmentId}/grades`;
   const headers = {
-    Authorization: `Bearer ${token}`,
+    Authorization: `token ${token}`,
     Accept: 'application/vnd.github+json',
   };
 
-  const response = await axios.get<StudentGrade[]>(url, { headers });
-  
-  // Each item: { student_repository_url, roster_identifier, github_username, points_awarded }
-  return response.data.map((item) => ({
-    name: item.github_username,
-    clone_url: item.student_repository_url,
-    roster_identifier: item.roster_identifier,
-    github_username: item.github_username,
-    points_awarded: item.points_awarded,
-  }));
+  const base = `https://api.github.com/repos/${org}/classroom50/contents/${classroomSlug}`;
+
+  const [rosterRes, scoresRes] = await Promise.all([
+    axios.get(`${base}/roster.csv`, { headers }),
+    axios.get(`${base}/scores.json`, { headers }).catch(() => null),
+  ]);
+
+  // roster.csv header: username,first_name,last_name,email,section,github_id,role
+  const rosterCsv = Buffer.from(rosterRes.data.content, 'base64').toString('utf-8');
+  const [header, ...rows] = rosterCsv.trim().split('\n');
+  const cols = header.split(',').map((c) => c.trim());
+  const usernameIdx = cols.indexOf('username');
+  const emailIdx = cols.indexOf('email');
+  const roleIdx = cols.indexOf('role');
+
+  const students = rows
+    .map((row) => row.split(',').map((c) => c.trim()))
+    .filter((cells) => cells[usernameIdx]) // skip pending rows (no username yet)
+    .filter((cells) => roleIdx < 0 || cells[roleIdx] === 'student'); // exclude teacher/TA rows
+
+  // scores.json: { assignments: { [slug]: { entries: [ { owner, submissions: [ { score, ... } ] } ] } } }
+  const scoreMap: Record<string, number> = {};
+  if (scoresRes) {
+    try {
+      const scoresJson = JSON.parse(Buffer.from(scoresRes.data.content, 'base64').toString('utf-8'));
+      const entries = scoresJson.assignments?.[assignmentSlug]?.entries ?? [];
+      for (const entry of entries) {
+        const latest = entry.submissions?.[0];
+        if (entry.owner && latest) scoreMap[entry.owner] = latest.score ?? 0;
+      }
+    } catch {}
+  }
+
+  return students.map((cells) => {
+    const username = cells[usernameIdx];
+    const email = emailIdx >= 0 ? cells[emailIdx] : '';
+    const repoName = `${classroomSlug}-${assignmentSlug}-${username}`;
+    return {
+      name: username,
+      clone_url: `https://github.com/${org}/${repoName}`,
+      roster_identifier: email || username,
+      github_username: username,
+      points_awarded: scoreMap[username] ?? '',
+    };
+  });
 }
 
 export async function cloneAndStart(repo: StudentRepo, index: number) {

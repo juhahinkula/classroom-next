@@ -2,16 +2,21 @@
 
 import { useState, useEffect } from 'react';
 
+interface Org {
+  login: string;
+  avatar_url: string;
+}
+
 interface Classroom {
-  id: number;
+  slug: string;
   name: string;
+  term?: string;
 }
 
 interface Assignment {
-  id: number;
-  title?: string;
+  slug: string;
   name?: string;
-  slug?: string;
+  title?: string;
 }
 
 interface Student {
@@ -32,9 +37,11 @@ interface RepoData {
 }
 
 export default function Home() {
+  const [orgs, setOrgs] = useState<Org[]>([]);
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [selectedOrg, setSelectedOrg] = useState<string>('');
   const [selectedClassroom, setSelectedClassroom] = useState<string>('');
   const [selectedAssignment, setSelectedAssignment] = useState<string>('');
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
@@ -51,47 +58,64 @@ export default function Home() {
   );
 
   useEffect(() => {
-    fetchClassrooms();
+    fetchOrgs();
   }, []);
 
-  const fetchClassrooms = async () => {
+  const fetchOrgs = async () => {
     try {
-      const response = await fetch('/api/classrooms');
+      const response = await fetch('/api/orgs');
       const data = await response.json();
-      setClassrooms(data);
+      setOrgs(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching organizations:', error);
+    }
+  };
+
+  const fetchClassrooms = async (org: string) => {
+    try {
+      const response = await fetch(`/api/classrooms?org=${org}`);
+      const data = await response.json();
+      setClassrooms(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching classrooms:', error);
     }
   };
 
-  const fetchAssignments = async (classroomId: string) => {
+  const fetchAssignments = async (org: string, classroomSlug: string) => {
     try {
-      const response = await fetch(`/api/assignments?classroomId=${classroomId}`);
+      const response = await fetch(`/api/assignments?org=${org}&classroomSlug=${classroomSlug}`);
       const data = await response.json();
-      setAssignments(data);
+      setAssignments(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching assignments:', error);
     }
   };
 
-  const fetchStudents = async (assignmentId: string) => {
+  const fetchStudents = async (org: string, classroomSlug: string) => {
     try {
-      const response = await fetch(`/api/students?assignmentId=${assignmentId}`);
+      const response = await fetch(`/api/students?org=${org}&classroomSlug=${classroomSlug}`);
       const data = await response.json();
-      setStudents(data);
+      setStudents(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching students:', error);
     }
   };
 
-  const fetchRepositories = async (assignmentId: string, studentUsername?: string) => {
+  const fetchRepositories = async (
+    org: string,
+    classroomSlug: string,
+    assignmentSlug: string,
+    studentUsername?: string
+  ) => {
     setLoading(true);
     try {
       const studentParam = studentUsername && studentUsername !== 'all' ? `&studentUsername=${studentUsername}` : '';
-      const response = await fetch(`/api/fetch?assignmentId=${assignmentId}${studentParam}`);
+      const response = await fetch(
+        `/api/fetch?org=${org}&classroomSlug=${classroomSlug}&assignmentSlug=${assignmentSlug}${studentParam}`
+      );
       const repoList = await response.json();
       const results: RepoData[] = [];
-   
+
       for (let i = 0; i < repoList.length; i++) {
         const repo = repoList[i];
         const res = await fetch('/api/fetch-one', {
@@ -110,29 +134,45 @@ export default function Home() {
     }
   };
 
+  const handleOrgChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const org = e.target.value;
+    setSelectedOrg(org);
+    setSelectedClassroom('');
+    setSelectedAssignment('');
+    setSelectedStudent('all');
+    setClassrooms([]);
+    setAssignments([]);
+    setStudents([]);
+    setRepoData([]);
+
+    if (org) {
+      fetchClassrooms(org);
+    }
+  };
+
   const handleClassroomChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const classroomId = e.target.value;
-    setSelectedClassroom(classroomId);
+    const classroomSlug = e.target.value;
+    setSelectedClassroom(classroomSlug);
     setSelectedAssignment('');
     setSelectedStudent('all');
     setAssignments([]);
     setStudents([]);
     setRepoData([]);
-    
-    if (classroomId) {
-      fetchAssignments(classroomId);
+
+    if (classroomSlug) {
+      fetchAssignments(selectedOrg, classroomSlug);
     }
   };
 
   const handleAssignmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const assignmentId = e.target.value;
-    setSelectedAssignment(assignmentId);
+    const assignmentSlug = e.target.value;
+    setSelectedAssignment(assignmentSlug);
     setSelectedStudent('all');
     setStudents([]);
     setRepoData([]);
-    
-    if (assignmentId) {
-      fetchStudents(assignmentId);
+
+    if (assignmentSlug) {
+      fetchStudents(selectedOrg, selectedClassroom);
     }
   };
 
@@ -143,8 +183,8 @@ export default function Home() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedAssignment) {
-      fetchRepositories(selectedAssignment, selectedStudent);
+    if (selectedOrg && selectedClassroom && selectedAssignment) {
+      fetchRepositories(selectedOrg, selectedClassroom, selectedAssignment, selectedStudent);
     }
   };
 
@@ -174,16 +214,35 @@ export default function Home() {
       <form onSubmit={handleSubmit} className="mb-6 space-y-4">
         <div>
           <label className="block text-sm font-medium mb-2">
+            Organization:
+            <select
+              value={selectedOrg}
+              onChange={handleOrgChange}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Select organization</option>
+              {orgs.map((o) => (
+                <option key={o.login} value={o.login}>
+                  {o.login}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">
             Classroom:
             <select
               value={selectedClassroom}
               onChange={handleClassroomChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              disabled={!selectedOrg}
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
             >
               <option value="">Select classroom</option>
               {classrooms.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
+                <option key={c.slug} value={c.slug}>
+                  {c.name}{c.term ? ` (${c.term})` : ''}
                 </option>
               ))}
             </select>
@@ -201,8 +260,8 @@ export default function Home() {
             >
               <option value="">Select assignment</option>
               {assignments.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.title || a.name || a.slug || a.id}
+                <option key={a.slug} value={a.slug}>
+                  {a.title || a.name || a.slug}
                 </option>
               ))}
             </select>
